@@ -1,6 +1,11 @@
-import axios from "axios";
-import { geocodeLocation } from "./utils";
-import { Tool } from "@modelcontextprotocol/sdk/server/tool.js";
+import { getWeatherData } from "./utils";
+import * as fs from 'fs';
+
+// Función para log que escribe a un archivo en lugar de stdout
+function logToFile(message: string) {
+  const logPath = '/tmp/weather-mcp.log';
+  fs.appendFileSync(logPath, new Date().toISOString() + ' - ' + message + '\n');
+}
 
 interface WeatherParams {
   location: string;
@@ -57,63 +62,37 @@ async function getWeatherImpl(params: WeatherParams): Promise<WeatherResponse> {
     // Limitar el número de días entre 1 y 7
     const forecastDays = Math.min(Math.max(parseInt(days.toString()), 1), 7);
 
-    // Obtener coordenadas si se proporciona un nombre de ubicación
-    let latitude: number, longitude: number;
-
-    if (typeof location === "string" && !location.match(/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/)) {
-      // Es un nombre de ubicación, necesitamos geocodificarlo
-      const coordinates = await geocodeLocation(location);
-      if ("error" in coordinates) {
-        return {
-          error: coordinates.error,
-          location: "",
-          elevation: "",
-          currentWeather: {
-            temperature: "",
-            windSpeed: "",
-            windDirection: "",
-            weatherCode: "",
-            time: "",
-          },
-        };
-      }
-      latitude = coordinates.latitude;
-      longitude = coordinates.longitude;
-    } else {
-      // Son coordenadas directas
-      if (typeof location === "string") {
-        const [lat, lon] = location.split(",");
-        latitude = parseFloat(lat);
-        longitude = parseFloat(lon);
-      } else {
-        return {
-          error: "Formato de ubicación inválido",
-          location: "",
-          elevation: "",
-          currentWeather: {
-            temperature: "",
-            windSpeed: "",
-            windDirection: "",
-            weatherCode: "",
-            time: "",
-          },
-        };
-      }
+    logToFile(`Obteniendo datos del clima para: ${location}, días: ${forecastDays}`);
+    
+    // Obtener datos del clima usando el método centralizado de utils.ts
+    const weatherResult = await getWeatherData(location, forecastDays);
+    
+    // Verificar si hay errores
+    if (weatherResult.error || !weatherResult.data) {
+      logToFile(`Error al obtener datos: ${weatherResult.error}`);
+      return {
+        error: weatherResult.error || "Error desconocido al obtener datos del clima",
+        details: weatherResult.details,
+        location: "",
+        elevation: "",
+        currentWeather: {
+          temperature: "",
+          windSpeed: "",
+          windDirection: "",
+          weatherCode: "",
+          time: "",
+        },
+      };
     }
 
-    // Construir la URL de la API
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true&hourly=temperature_2m,relativehumidity_2m,precipitation,windspeed_10m,winddirection_10m&forecast_days=${forecastDays}`;
-
-    // Realizar la petición a la API
-    const response = await axios.get(url);
-    const data = response.data;
-
+    logToFile(`Datos recibidos correctamente, formateando respuesta`);
+    
     // Formatear la respuesta
-    const result = formatWeatherResponse(data, details);
-
+    const result = formatWeatherResponse(weatherResult.data, details);
     return result;
+
   } catch (error) {
-    console.error("Error al obtener datos del clima:", error);
+    logToFile(`Error en getWeatherImpl: ${error}`);
     return {
       error: "Error al obtener datos del clima",
       details: error instanceof Error ? error.message : String(error),
@@ -130,8 +109,8 @@ async function getWeatherImpl(params: WeatherParams): Promise<WeatherResponse> {
   }
 }
 
-// Define the weatherTool with proper MCP Tool schema
-export const weatherTool = new Tool({
+// Define the weatherTool with a simple object structure that matches what MCP expects
+export const weatherTool = {
   name: "getWeather",
   description: "Obtiene información meteorológica para una ubicación específica",
   parameters: {
@@ -155,35 +134,75 @@ export const weatherTool = new Tool({
     required: ["location"]
   },
   handler: getWeatherImpl
-});
+};
 
 /**
  * Formatea la respuesta del clima para que sea más legible
  */
 function formatWeatherResponse(data: any, includeDetails: boolean): WeatherResponse {
-  // Información básica del clima actual
-  const currentWeather = {
-    temperature: `${data.current_weather.temperature}°C`,
-    windSpeed: `${data.current_weather.windspeed} km/h`,
-    windDirection: `${data.current_weather.winddirection}°`,
-    weatherCode: getWeatherDescription(data.current_weather.weathercode),
-    time: new Date(data.current_weather.time).toLocaleString(),
-  };
+  try {
+    logToFile(`Formateando respuesta del clima, datos: ${JSON.stringify(Object.keys(data))}`);
+    
+    // La API puede devolver current o current_weather dependiendo de la versión
+    const current = data.current || data.current_weather;
+    
+    if (!current) {
+      logToFile(`Error: No se encontró información del clima actual en la respuesta`);
+      logToFile(`Datos recibidos: ${JSON.stringify(data).substring(0, 200)}...`);
+      
+      return {
+        error: "Formato de respuesta de API no reconocido",
+        location: "",
+        elevation: "",
+        currentWeather: {
+          temperature: "",
+          windSpeed: "",
+          windDirection: "",
+          weatherCode: "",
+          time: "",
+        },
+      };
+    }
+    
+    // Información básica del clima actual
+    const currentWeather = {
+      temperature: `${current.temperature || current.temperature_2m}°C`,
+      windSpeed: `${current.windspeed || current.wind_speed || current.windspeed_10m} km/h`,
+      windDirection: `${current.winddirection || current.wind_direction || current.winddirection_10m}°`,
+      weatherCode: getWeatherDescription(current.weathercode || current.weather_code),
+      time: new Date(current.time).toLocaleString(),
+    };
 
-  let response: WeatherResponse = {
-    location: `${data.latitude}, ${data.longitude}`,
-    elevation: `${data.elevation}m`,
-    currentWeather,
-  };
+    let response: WeatherResponse = {
+      location: `${data.latitude}, ${data.longitude}`,
+      elevation: `${data.elevation}m`,
+      currentWeather,
+    };
 
-  // Incluir datos horarios si se solicitan detalles
-  if (includeDetails) {
-    // Agrupar por días
-    const dailyForecasts = groupByDay(data.hourly);
-    response.forecast = dailyForecasts;
+    // Incluir datos horarios si se solicitan detalles
+    if (includeDetails && data.hourly) {
+      // Agrupar por días
+      const dailyForecasts = groupByDay(data.hourly);
+      response.forecast = dailyForecasts;
+    }
+
+    return response;
+  } catch (error) {
+    logToFile(`Error en formatWeatherResponse: ${error}`);
+    return {
+      error: "Error al formatear datos del clima",
+      details: error instanceof Error ? error.message : String(error),
+      location: "",
+      elevation: "",
+      currentWeather: {
+        temperature: "",
+        windSpeed: "",
+        windDirection: "",
+        weatherCode: "",
+        time: "",
+      },
+    };
   }
-
-  return response;
 }
 
 /**
