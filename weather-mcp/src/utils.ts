@@ -1,5 +1,3 @@
-import axios from "axios";
-
 interface Coordinates {
   latitude: number;
   longitude: number;
@@ -21,13 +19,14 @@ async function geocodeLocation(locationName: string): Promise<Coordinates | Geoc
   try {
     const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(locationName)}&count=1&language=es&format=json`;
 
-    const response = await axios.get(url);
+    const response = await fetch(url);
+    const data = await response.json();
 
-    if (!response.data.results || response.data.results.length === 0) {
+    if (!data.results || data.results.length === 0) {
       return {error: `No se encontró la ubicación: ${locationName}`};
     }
 
-    const location = response.data.results[0];
+    const location = data.results[0];
 
     return {
       latitude: location.latitude,
