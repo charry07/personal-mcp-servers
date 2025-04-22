@@ -1,5 +1,6 @@
 import axios from "axios";
 import { geocodeLocation } from "./utils";
+import { Tool } from "@modelcontextprotocol/sdk/server/tool.js";
 
 interface WeatherParams {
   location: string;
@@ -33,7 +34,7 @@ interface HourlyData {
 /**
  * Herramienta MCP para obtener información meteorológica
  */
-async function weatherTool(params: WeatherParams): Promise<WeatherResponse> {
+async function getWeatherImpl(params: WeatherParams): Promise<WeatherResponse> {
   try {
     // Validar los parámetros
     const {location, days = 1, details = false} = params;
@@ -128,6 +129,33 @@ async function weatherTool(params: WeatherParams): Promise<WeatherResponse> {
     };
   }
 }
+
+// Define the weatherTool with proper MCP Tool schema
+export const weatherTool = new Tool({
+  name: "getWeather",
+  description: "Obtiene información meteorológica para una ubicación específica",
+  parameters: {
+    type: "object",
+    properties: {
+      location: {
+        type: "string",
+        description: "Coordenadas (latitud,longitud) o nombre de la ciudad"
+      },
+      days: {
+        type: "number",
+        description: "Número de días para el pronóstico (1-7)",
+        default: 1
+      },
+      details: {
+        type: "boolean",
+        description: "Si es true, devuelve información más detallada",
+        default: false
+      }
+    },
+    required: ["location"]
+  },
+  handler: getWeatherImpl
+});
 
 /**
  * Formatea la respuesta del clima para que sea más legible
@@ -226,6 +254,5 @@ function getWeatherDescription(code: number): string {
   return weatherCodes[code] || `Código desconocido (${code})`;
 }
 
-export { weatherTool };
 export type { WeatherParams, WeatherResponse };
 

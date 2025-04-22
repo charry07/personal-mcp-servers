@@ -1,16 +1,18 @@
-import {McpServer} from "@modelcontextprotocol/sdk/server/mcp.js";
-import {StdioServerTransport} from "@modelcontextprotocol/sdk/server/stdio.js";
-import {weatherTool} from "./src/weather-tool";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { weatherTool } from "./src/weather-tool";
 
 // Crear un nuevo servidor MCP
-export const server = new McpServer({
+const server = new McpServer({
   name: "Weather MCP Server",
-  description: "Un servidor de ejemplo para el Weather MCP",
+  description: "Un servidor MCP para consultar información del clima",
   version: "1.0.0",
   tools: [weatherTool],
 });
 
 const transport = new StdioServerTransport();
 (async () => {
+  console.log("Starting Weather MCP Server...");
   await server.connect(transport);
+  console.log("Weather MCP Server connected");
 })();
