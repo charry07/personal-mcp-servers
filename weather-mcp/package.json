@@ -1,0 +1,27 @@
+{
+  "name": "weather-mcp-server",
+  "version": "1.0.0",
+  "description": "Un servidor MCP para consultar información del clima utilizando la API Open-Meteo",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "weather",
+    "open-meteo",
+    "api",
+    "claude"
+  ],
+  "author": "Anderson Charry",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.1",
+    "axios": "^1.6.2",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
