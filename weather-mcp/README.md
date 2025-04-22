@@ -24,22 +24,28 @@ npm install
 npm start
 ```
 
-## Configuración en tu entorno
+## Configuración en VS Code
 
-Para usar este servidor MCP con Claude Desktop, añade esta configuración a tu `settings.json`:
+Para usar este servidor MCP con VS Code, añade esta configuración a tu `settings.json`:
 
 ```json
 "mcp": {
   "servers": {
     "weather": {
-      "command": "node",
-      "args": ["/Users/andersoncharry/My_WP/personal-mcp-servers/weather-mcp/src/index.js"]
+      "command": "npx",
+      "args": ["-y", "tsx", "RUTA_AL_REPOSITORIO/weather-mcp/index.ts"]
     }
   }
 }
 ```
 
-Para usar con otros entornos compatibles con MCP, sigue la documentación específica de ese entorno.
+**Importante:** Reemplaza `RUTA_AL_REPOSITORIO` con la ruta absoluta donde has clonado este repositorio en tu sistema.
+
+Por ejemplo:
+- En macOS/Linux: `/Users/tunombre/personal-mcp-servers`
+- En Windows: `C:\\Users\\tunombre\\personal-mcp-servers`
+
+También puedes usar rutas relativas desde tu workspace de VS Code si el repositorio está dentro del workspace.
 
 ## Herramientas disponibles
 
