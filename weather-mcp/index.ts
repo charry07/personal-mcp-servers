@@ -285,31 +285,14 @@ async function startServer() {
     });
 
     // Registrar la herramienta getWeather
-    server.tool("getWeather", "Obtiene información meteorológica para una ubicación específica", {parameters: weatherParamsSchema}, async ({parameters}) => {
+    server.tool("Weather by ACN", "Obtiene información meteorológica para una ubicación específica", {parameters: weatherParamsSchema}, async ({parameters}) => {
       const result = await processWeatherRequest(parameters);
 
       // Si hay un error, devolverlo como error MCP
-      if (result.error) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(result),
-            },
-          ],
-          isError: true,
-        };
-      }
+      if (result.error) return {content: [{type: "text", text: JSON.stringify(result)}], isError: true};
 
       // Si no hay error, devolver el resultado normal
-      return {
-        content: [
-          {
-            type: "text",
-            text: JSON.stringify(result),
-          },
-        ],
-      };
+      return {content: [{type: "text", text: JSON.stringify(result)}]};
     });
 
     // Conectar el servidor con transporte estándar
