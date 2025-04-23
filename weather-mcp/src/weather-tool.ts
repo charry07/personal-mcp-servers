@@ -1,11 +1,4 @@
 import { getWeatherData } from "./utils";
-import * as fs from 'fs';
-
-// Función para log que escribe a un archivo en lugar de stdout
-function logToFile(message: string) {
-  const logPath = '/tmp/weather-mcp.log';
-  fs.appendFileSync(logPath, new Date().toISOString() + ' - ' + message + '\n');
-}
 
 interface WeatherParams {
   location: string;
@@ -61,15 +54,12 @@ async function getWeatherImpl(params: WeatherParams): Promise<WeatherResponse> {
 
     // Limitar el número de días entre 1 y 7
     const forecastDays = Math.min(Math.max(parseInt(days.toString()), 1), 7);
-
-    logToFile(`Obteniendo datos del clima para: ${location}, días: ${forecastDays}`);
     
     // Obtener datos del clima usando el método centralizado de utils.ts
     const weatherResult = await getWeatherData(location, forecastDays);
     
     // Verificar si hay errores
     if (weatherResult.error || !weatherResult.data) {
-      logToFile(`Error al obtener datos: ${weatherResult.error}`);
       return {
         error: weatherResult.error || "Error desconocido al obtener datos del clima",
         details: weatherResult.details,
@@ -84,15 +74,12 @@ async function getWeatherImpl(params: WeatherParams): Promise<WeatherResponse> {
         },
       };
     }
-
-    logToFile(`Datos recibidos correctamente, formateando respuesta`);
     
     // Formatear la respuesta
     const result = formatWeatherResponse(weatherResult.data, details);
     return result;
 
   } catch (error) {
-    logToFile(`Error en getWeatherImpl: ${error}`);
     return {
       error: "Error al obtener datos del clima",
       details: error instanceof Error ? error.message : String(error),
@@ -109,29 +96,36 @@ async function getWeatherImpl(params: WeatherParams): Promise<WeatherResponse> {
   }
 }
 
-// Define the weatherTool with a simple object structure that matches what MCP expects
+// Define la herramienta getWeather según el formato específico que MCP espera
 export const weatherTool = {
   name: "getWeather",
   description: "Obtiene información meteorológica para una ubicación específica",
-  parameters: {
-    type: "object",
-    properties: {
-      location: {
-        type: "string",
-        description: "Coordenadas (latitud,longitud) o nombre de la ciudad"
+  schema: {
+    type: "function",
+    function: {
+      name: "getWeather",
+      description: "Obtiene información meteorológica para una ubicación específica",
+      parameters: {
+        type: "object",
+        properties: {
+          location: {
+            type: "string",
+            description: "Coordenadas (latitud,longitud) o nombre de la ciudad"
+          },
+          days: {
+            type: "number",
+            description: "Número de días para el pronóstico (1-7)",
+            default: 1
+          },
+          details: {
+            type: "boolean",
+            description: "Si es true, devuelve información más detallada",
+            default: false
+          }
+        },
+        required: ["location"]
       },
-      days: {
-        type: "number",
-        description: "Número de días para el pronóstico (1-7)",
-        default: 1
-      },
-      details: {
-        type: "boolean",
-        description: "Si es true, devuelve información más detallada",
-        default: false
-      }
-    },
-    required: ["location"]
+    }
   },
   handler: getWeatherImpl
 };
@@ -141,15 +135,10 @@ export const weatherTool = {
  */
 function formatWeatherResponse(data: any, includeDetails: boolean): WeatherResponse {
   try {
-    logToFile(`Formateando respuesta del clima, datos: ${JSON.stringify(Object.keys(data))}`);
-    
     // La API puede devolver current o current_weather dependiendo de la versión
     const current = data.current || data.current_weather;
     
     if (!current) {
-      logToFile(`Error: No se encontró información del clima actual en la respuesta`);
-      logToFile(`Datos recibidos: ${JSON.stringify(data).substring(0, 200)}...`);
-      
       return {
         error: "Formato de respuesta de API no reconocido",
         location: "",
@@ -188,7 +177,6 @@ function formatWeatherResponse(data: any, includeDetails: boolean): WeatherRespo
 
     return response;
   } catch (error) {
-    logToFile(`Error en formatWeatherResponse: ${error}`);
     return {
       error: "Error al formatear datos del clima",
       details: error instanceof Error ? error.message : String(error),
